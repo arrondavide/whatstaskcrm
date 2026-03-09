@@ -1,5 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+
+export const googleProvider = new GoogleAuthProvider();
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
