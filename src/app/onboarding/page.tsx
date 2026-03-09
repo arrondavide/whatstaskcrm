@@ -5,7 +5,6 @@ import { useAuthContext } from "@/components/providers/auth-provider";
 import { useAuthStore } from "@/stores/auth-store";
 import { useTenantStore } from "@/stores/tenant-store";
 import { SetupWizard } from "@/components/onboarding/setup-wizard";
-import { auth } from "@/lib/firebase/client";
 import toast from "react-hot-toast";
 
 export default function OnboardingPage() {
@@ -25,7 +24,6 @@ export default function OnboardingPage() {
     theme: "dark" | "light";
     recordLabel: string;
     recordLabelSingular: string;
-    logoUrl?: string;
     inviteEmails: string[];
   }) {
     try {
@@ -40,7 +38,6 @@ export default function OnboardingPage() {
           theme: data.theme,
           recordLabel: data.recordLabel,
           recordLabelSingular: data.recordLabelSingular,
-          logoUrl: data.logoUrl,
           inviteEmails: data.inviteEmails,
         }),
       });

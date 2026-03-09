@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,6 @@ import {
   Palette,
   Users,
   Sparkles,
-  Upload,
   X,
   Loader2,
   Sun,
@@ -32,7 +31,6 @@ interface WizardData {
   theme: "dark" | "light";
   recordLabel: string;
   recordLabelSingular: string;
-  logoUrl?: string;
   inviteEmails: string[];
 }
 
@@ -64,12 +62,10 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
   const [recordLabel, setRecordLabel] = useState("");
   const [recordLabelSingular, setRecordLabelSingular] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [emailError, setEmailError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleThemeChange(newTheme: "dark" | "light") {
     setTheme(newTheme);
@@ -84,24 +80,6 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
     setSelectedPreset(preset.label);
     setRecordLabel(preset.record);
     setRecordLabelSingular(preset.singular);
-  }
-
-  function handleLogoSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      return; // Max 2MB
-    }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setLogoPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function removeLogo() {
-    setLogoPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function validateEmail(email: string) {
@@ -137,7 +115,6 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
         theme,
         recordLabel: recordLabel || "Records",
         recordLabelSingular: recordLabelSingular || "Record",
-        logoUrl: logoPreview || undefined,
         inviteEmails,
       });
     } finally {
@@ -240,48 +217,8 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
                     Make it yours
                   </h2>
                   <p className="mt-1 text-[13px] text-muted-foreground">
-                    Add your logo and pick a brand color
+                    Pick a brand color and theme for your workspace
                   </p>
-                </div>
-
-                {/* Logo upload */}
-                <div className="space-y-2">
-                  <Label>Company Logo</Label>
-                  <div className="flex items-center gap-4">
-                    {logoPreview ? (
-                      <div className="relative">
-                        <img
-                          src={logoPreview}
-                          alt="Logo"
-                          className="h-16 w-16 rounded-xl object-cover border border-border"
-                        />
-                        <button
-                          onClick={removeLogo}
-                          className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                      >
-                        <Upload className="h-5 w-5" />
-                      </button>
-                    )}
-                    <div className="text-[12px] text-muted-foreground">
-                      <p>Upload your logo</p>
-                      <p>PNG, JPG up to 2MB</p>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoSelect}
-                      className="hidden"
-                    />
-                  </div>
                 </div>
 
                 {/* Color picker */}
@@ -344,16 +281,12 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
                 {/* Preview */}
                 <div className="rounded-xl border border-border/60 p-5 text-center">
                   <div className="flex items-center justify-center gap-3">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="Logo" className="h-10 w-10 rounded-lg object-cover" />
-                    ) : (
-                      <div
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        {companyName[0]?.toUpperCase() || "C"}
-                      </div>
-                    )}
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {companyName[0]?.toUpperCase() || "C"}
+                    </div>
                     <div className="text-left">
                       <p className="font-semibold text-[14px]">{companyName}</p>
                       <p className="text-[11px] text-muted-foreground">Your workspace preview</p>
@@ -465,16 +398,12 @@ export function SetupWizard({ onComplete, userName }: SetupWizardProps) {
                 {/* Summary */}
                 <div className="rounded-xl border border-border/60 p-4 text-left space-y-3">
                   <div className="flex items-center gap-3">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
-                    ) : (
-                      <div
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
-                        style={{ backgroundColor: primaryColor }}
-                      >
-                        {companyName[0]?.toUpperCase() || "C"}
-                      </div>
-                    )}
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {companyName[0]?.toUpperCase() || "C"}
+                    </div>
                     <p className="font-medium text-[14px]">{companyName}</p>
                   </div>
                   <div className="h-px bg-border/60" />

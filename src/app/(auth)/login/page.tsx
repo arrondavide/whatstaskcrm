@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -38,7 +38,6 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export default function LoginPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleGoogleSignIn() {
@@ -46,16 +45,14 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, googleProvider);
       // AuthProvider's onAuthStateChanged will handle routing
-      // (to /onboarding for new users, or /dashboard for existing)
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to sign in";
-      if (message.includes("popup-closed-by-user")) {
-        // User closed the popup, do nothing
+      if (message.includes("popup-closed-by-user") || message.includes("popup-blocked")) {
+        setLoading(false);
         return;
       }
       toast.error("Failed to sign in. Please try again.");
-    } finally {
       setLoading(false);
     }
   }
@@ -76,10 +73,19 @@ export default function LoginPage() {
           variant="outline"
           className="w-full h-11 text-[14px]"
           onClick={handleGoogleSignIn}
-          loading={loading}
+          disabled={loading}
         >
-          <GoogleIcon className="h-5 w-5 mr-2" />
-          Continue with Google
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            <>
+              <GoogleIcon className="h-5 w-5 mr-2" />
+              Continue with Google
+            </>
+          )}
         </Button>
         <p className="mt-5 text-center text-[12px] text-muted-foreground/60">
           By continuing, you agree to our Terms of Service and Privacy Policy.

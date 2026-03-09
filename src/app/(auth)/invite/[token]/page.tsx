@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase/client";
-import { useAuthStore } from "@/stores/auth-store";
-import { useTenantStore } from "@/stores/tenant-store";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,9 +37,6 @@ export default function InvitePage() {
   const router = useRouter();
   const params = useParams();
   const token = params.token as string;
-  const { setUser } = useAuthStore();
-  const { setTenant } = useTenantStore();
-
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
@@ -87,11 +82,8 @@ export default function InvitePage() {
         return;
       }
 
-      const data = await res.json();
-      setUser(data.user);
-      setTenant(data.tenant);
-
       toast.success(`Welcome to ${invite?.tenant_name}!`);
+      // AuthProvider will detect the new user doc and redirect to dashboard
       router.push("/dashboard");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to sign in";
