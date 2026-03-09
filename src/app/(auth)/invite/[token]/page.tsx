@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,40 +39,12 @@ export default function InvitePage() {
   const token = params.token as string;
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validate the invite on load + handle redirect result
+  // Validate the invite on load
   useEffect(() => {
-    async function init() {
-      // Check if returning from Google redirect
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          // User just signed in via redirect — accept the invite
-          setAccepting(true);
-          const idToken = await result.user.getIdToken();
-          const res = await fetch("/api/invites/accept", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: idToken, inviteId: token }),
-          });
-
-          if (!res.ok) {
-            const data = await res.json();
-            toast.error(data.error || "Failed to join workspace");
-            setAccepting(false);
-          } else {
-            toast.success("Welcome! Redirecting...");
-            router.push("/dashboard");
-            return;
-          }
-        }
-      } catch {
-        // No redirect result — that's fine
-      }
-
-      // Validate the invite
+    async function validateInvite() {
       try {
         const res = await fetch(`/api/invites?id=${token}`);
         if (!res.ok) {
@@ -88,22 +60,46 @@ export default function InvitePage() {
         setLoading(false);
       }
     }
-    init();
-  }, [token, router]);
+    validateInvite();
+  }, [token]);
 
-  function handleGoogleSignIn() {
-    signInWithRedirect(auth, googleProvider);
+  async function handleGoogleSignIn() {
+    setSigning(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+
+      // Accept the invite
+      const res = await fetch("/api/invites/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: idToken, inviteId: token }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to join workspace");
+        return;
+      }
+
+      toast.success(`Welcome to ${invite?.tenant_name}!`);
+      router.push("/dashboard");
+    } catch (error: unknown) {
+      const code = (error as { code?: string })?.code || "";
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
+      toast.error("Failed to sign in. Please try again.");
+    } finally {
+      setSigning(false);
+    }
   }
 
-  // Loading / accepting state
-  if (loading || accepting) {
+  // Loading state
+  if (loading) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <p className="mt-3 text-[13px] text-muted-foreground">
-            {accepting ? "Joining workspace..." : "Validating invite..."}
-          </p>
+          <p className="mt-3 text-[13px] text-muted-foreground">Validating invite...</p>
         </CardContent>
       </Card>
     );
@@ -148,9 +144,19 @@ export default function InvitePage() {
           variant="outline"
           className="w-full h-11 text-[14px]"
           onClick={handleGoogleSignIn}
+          disabled={signing}
         >
-          <GoogleIcon className="h-5 w-5 mr-2" />
-          Continue with Google
+          {signing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Joining...
+            </>
+          ) : (
+            <>
+              <GoogleIcon className="h-5 w-5 mr-2" />
+              Continue with Google
+            </>
+          )}
         </Button>
         <p className="mt-4 text-center text-[12px] text-muted-foreground/60">
           Sign in with the Google account linked to your invite email.
