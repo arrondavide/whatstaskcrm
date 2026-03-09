@@ -45,7 +45,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      router.push("/dashboard");
+      // AuthProvider's onAuthStateChanged will handle routing
+      // (to /onboarding for new users, or /dashboard for existing)
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to sign in";
