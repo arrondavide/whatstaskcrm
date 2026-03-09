@@ -92,12 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           // Other error — log the full response
           const errData = await res.json().catch(() => ({}));
-          console.error("Auth API error:", res.status, errData);
-
-          // If it's a server config error, still try onboarding
-          if (res.status === 500) {
-            console.error("Server config issue — check env vars");
-          }
+          console.error(`Auth API error [${res.status}]:`, errData.error, errData.details || "");
 
           setAuthLoading(false);
           setTenantLoading(false);

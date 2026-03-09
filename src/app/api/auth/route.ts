@@ -10,18 +10,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No token provided" }, { status: 401 });
     }
 
-    const adminAuth = getAdminAuth();
-    const adminDb = getAdminDb();
+    let adminAuth, adminDb;
+    try {
+      adminAuth = getAdminAuth();
+      adminDb = getAdminDb();
+    } catch (initError) {
+      console.error("Admin SDK init failed:", initError);
+      return NextResponse.json({ error: "Server configuration error", details: String(initError) }, { status: 500 });
+    }
 
     // Verify the Firebase ID token
-    const decoded = await adminAuth.verifyIdToken(token);
+    let decoded;
+    try {
+      decoded = await adminAuth.verifyIdToken(token);
+    } catch (tokenError) {
+      console.error("Token verification failed:", tokenError);
+      return NextResponse.json({ error: "Invalid token", details: String(tokenError) }, { status: 401 });
+    }
 
-    // Find user across tenants by UID first, then by email
-    let usersSnapshot = await adminDb
-      .collectionGroup("users")
-      .where("email", "==", decoded.email)
-      .limit(1)
-      .get();
+    // Find user across tenants by email
+    let usersSnapshot;
+    try {
+      usersSnapshot = await adminDb
+        .collectionGroup("users")
+        .where("email", "==", decoded.email)
+        .limit(1)
+        .get();
+    } catch (queryError) {
+      console.error("Firestore collectionGroup query failed:", queryError);
+      console.error("This likely means a collection group index is needed for 'users.email'");
+      return NextResponse.json({
+        error: "Database query failed — collection group index may be missing",
+        details: String(queryError)
+      }, { status: 500 });
+    }
 
     if (usersSnapshot.empty) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -80,16 +102,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Auth error details:", message);
-    console.error("FIREBASE_ADMIN_PROJECT_ID set:", !!process.env.FIREBASE_ADMIN_PROJECT_ID);
-    console.error("FIREBASE_ADMIN_CLIENT_EMAIL set:", !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL);
-    console.error("FIREBASE_ADMIN_PRIVATE_KEY set:", !!process.env.FIREBASE_ADMIN_PRIVATE_KEY);
-    console.error("FIREBASE_ADMIN_PRIVATE_KEY length:", process.env.FIREBASE_ADMIN_PRIVATE_KEY?.length || 0);
-
-    // Distinguish between config errors and auth errors
-    if (message.includes("credential") || message.includes("FIREBASE_ADMIN") || message.includes("Failed to determine service account") || message.includes("not configured")) {
-      return NextResponse.json({ error: "Server configuration error", details: message }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Authentication failed", details: message }, { status: 401 });
+    console.error("Auth unexpected error:", message);
+    return NextResponse.json({ error: "Unexpected server error", details: message }, { status: 500 });
   }
 }
