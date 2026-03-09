@@ -78,8 +78,18 @@ export async function POST(req: NextRequest) {
       },
       fields,
     });
-  } catch (error) {
-    console.error("Auth error:", error);
-    return NextResponse.json({ error: "Authentication failed" }, { status: 401 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Auth error details:", message);
+    console.error("FIREBASE_ADMIN_PROJECT_ID set:", !!process.env.FIREBASE_ADMIN_PROJECT_ID);
+    console.error("FIREBASE_ADMIN_CLIENT_EMAIL set:", !!process.env.FIREBASE_ADMIN_CLIENT_EMAIL);
+    console.error("FIREBASE_ADMIN_PRIVATE_KEY set:", !!process.env.FIREBASE_ADMIN_PRIVATE_KEY);
+    console.error("FIREBASE_ADMIN_PRIVATE_KEY length:", process.env.FIREBASE_ADMIN_PRIVATE_KEY?.length || 0);
+
+    // Distinguish between config errors and auth errors
+    if (message.includes("credential") || message.includes("FIREBASE_ADMIN") || message.includes("Failed to determine service account") || message.includes("not configured")) {
+      return NextResponse.json({ error: "Server configuration error", details: message }, { status: 500 });
+    }
+    return NextResponse.json({ error: "Authentication failed", details: message }, { status: 401 });
   }
 }
