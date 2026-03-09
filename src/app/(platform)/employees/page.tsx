@@ -19,8 +19,10 @@ import {
   Mail,
   Shield,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { auth } from "@/lib/firebase/client";
 import type { User, UserRole } from "@/types/user";
 
 const roleColors: Record<UserRole, "default" | "secondary" | "outline" | "warning"> = {
@@ -35,15 +37,51 @@ export default function EmployeesPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<UserRole>("employee");
   const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
-  // TODO: Fetch employees from Firestore
+  // TODO: Fetch employees from Firestore with real-time listener
   const employees: User[] = [];
 
+  function validateEmail(email: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
   async function handleInvite() {
-    if (!inviteEmail) return;
+    setEmailError("");
+    if (!inviteEmail) {
+      setEmailError("Email is required");
+      return;
+    }
+    if (!validateEmail(inviteEmail)) {
+      setEmailError("Please enter a valid email");
+      return;
+    }
+
     setLoading(true);
     try {
-      // TODO: Send invite via API
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast.error("You must be signed in");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: idToken,
+          email: inviteEmail,
+          role: inviteRole,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to send invitation");
+        return;
+      }
+
       toast.success(`Invitation sent to ${inviteEmail}`);
       setShowInviteModal(false);
       setInviteEmail("");
@@ -70,7 +108,7 @@ export default function EmployeesPage() {
         <EmptyState
           icon={<Users className="h-12 w-12" />}
           title="No team members yet"
-          description="Invite your first employee to start collaborating"
+          description="Invite your first employee to start collaborating. They'll receive an email with a link to join."
           action={{
             label: "Invite Employee",
             onClick: () => setShowInviteModal(true),
@@ -82,18 +120,18 @@ export default function EmployeesPage() {
             <Card key={emp.id}>
               <CardContent className="flex items-start justify-between p-4">
                 <div className="flex items-center gap-3">
-                  <Avatar name={emp.name} size="md" />
+                  <Avatar name={emp.name} src={emp.avatar_url} size="md" />
                   <div>
-                    <p className="font-medium">{emp.name}</p>
-                    <p className="text-sm text-muted-foreground">{emp.email}</p>
-                    <Badge variant={roleColors[emp.role]} className="mt-1">
+                    <p className="text-[14px] font-medium">{emp.name}</p>
+                    <p className="text-[12px] text-muted-foreground">{emp.email}</p>
+                    <Badge variant={roleColors[emp.role]} className="mt-1.5">
                       {emp.role}
                     </Badge>
                   </div>
                 </div>
                 <Dropdown
                   trigger={
-                    <button className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
+                    <button className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent/60 transition-colors">
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                   }
@@ -116,9 +154,12 @@ export default function EmployeesPage() {
       {/* Invite modal */}
       <Modal
         open={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
+        onClose={() => {
+          setShowInviteModal(false);
+          setEmailError("");
+        }}
         title="Invite Employee"
-        description="Send an invitation to join your workspace"
+        description="They'll receive an email with a link to join your workspace"
         size="sm"
       >
         <div className="space-y-4">
@@ -127,9 +168,14 @@ export default function EmployeesPage() {
             <Input
               id="invite-email"
               type="email"
-              placeholder="employee@company.com"
+              placeholder="colleague@company.com"
               value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              onChange={(e) => {
+                setInviteEmail(e.target.value);
+                setEmailError("");
+              }}
+              error={emailError}
+              autoFocus
             />
           </div>
           <div className="space-y-2">
@@ -139,20 +185,35 @@ export default function EmployeesPage() {
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as UserRole)}
               options={[
-                { value: "admin", label: "Admin" },
-                { value: "manager", label: "Manager" },
-                { value: "employee", label: "Employee" },
-                { value: "viewer", label: "Viewer" },
+                { value: "employee", label: "Employee — Can create and edit records" },
+                { value: "manager", label: "Manager — Can manage records and invite" },
+                { value: "admin", label: "Admin — Full access" },
+                { value: "viewer", label: "Viewer — Read-only access" },
               ]}
             />
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowInviteModal(false)}>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowInviteModal(false);
+                setEmailError("");
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleInvite} loading={loading}>
-              <Mail className="mr-2 h-4 w-4" />
-              Send Invite
+            <Button onClick={handleInvite} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Invite
+                </>
+              )}
             </Button>
           </div>
         </div>

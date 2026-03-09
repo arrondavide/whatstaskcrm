@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
 
 // Verify session and return user + tenant info
 export async function POST(req: NextRequest) {
@@ -10,12 +10,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No token provided" }, { status: 401 });
     }
 
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
+
     // Verify the Firebase ID token
     const decoded = await adminAuth.verifyIdToken(token);
 
-    // Get user document from Firestore
-    // Find user across tenants by email
-    const usersSnapshot = await adminDb
+    // Find user across tenants by UID first, then by email
+    let usersSnapshot = await adminDb
       .collectionGroup("users")
       .where("email", "==", decoded.email)
       .limit(1)
@@ -50,6 +52,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Update last_active
+    userDoc.ref.update({ last_active: new Date().toISOString() }).catch(() => {});
+
+    // Get fields for this tenant
+    const fieldsSnapshot = await adminDb
+      .collection(`tenants/${tenantId}/fields`)
+      .orderBy("order")
+      .get();
+
+    const fields = fieldsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
     return NextResponse.json({
       user: {
         id: userDoc.id,
@@ -60,6 +76,7 @@ export async function POST(req: NextRequest) {
         id: tenantId,
         ...tenantData,
       },
+      fields,
     });
   } catch (error) {
     console.error("Auth error:", error);

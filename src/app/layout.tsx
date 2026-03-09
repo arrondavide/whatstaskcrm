@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Urbanist } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import { AuthProvider } from "@/components/providers/auth-provider";
 
 const urbanist = Urbanist({
   subsets: ["latin"],
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={urbanist.className}>
+        <AuthProvider>
         {children}
+        </AuthProvider>
         <Toaster
           position="top-right"
           toastOptions={{
