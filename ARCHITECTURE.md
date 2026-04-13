@@ -2608,7 +2608,7 @@ Every data-fetching component shows a skeleton while loading:
 
 ```bash
 # ── Database (Neon Serverless Postgres) ──────────────
-DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/crmwhatstask?sslmode=require
+DATABASE_URL=postgresql://neondb_owner:<password>@ep-winter-tooth-a4yupbkk-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 
 # ── Firebase Auth (client-side — Google OAuth) ───────
 NEXT_PUBLIC_FIREBASE_API_KEY=
