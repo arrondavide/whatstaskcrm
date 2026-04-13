@@ -52,11 +52,18 @@ export default function EmployeesPage() {
       if (!data.success) throw new Error(data.error?.message);
       return data.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["invites"] });
       setShowInvite(false);
       setInviteEmail("");
-      toast.success("Invite sent!");
+      // Copy invite link to clipboard
+      const inviteLink = `${window.location.origin}/invite/${result.id}`;
+      navigator.clipboard.writeText(inviteLink).then(() => {
+        toast.success("Invite created! Link copied to clipboard. Email sent.");
+      }).catch(() => {
+        toast.success("Invite created! Email sent.");
+        prompt("Copy this invite link:", inviteLink);
+      });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -212,9 +219,25 @@ export default function EmployeesPage() {
                     <p className="text-xs text-gray-500">Invited {new Date(invite.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${roleColors[invite.role]}`}>
-                  {invite.role}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${roleColors[invite.role]}`}>
+                    {invite.role}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const link = `${window.location.origin}/invite/${invite.id}`;
+                      navigator.clipboard.writeText(link).then(() => {
+                        toast.success("Invite link copied!");
+                      }).catch(() => {
+                        prompt("Copy this invite link:", link);
+                      });
+                    }}
+                    className="flex items-center gap-1 rounded-md border border-gray-700 px-2 py-1 text-xs text-gray-400 hover:bg-gray-800 hover:text-white"
+                  >
+                    <Copy size={12} />
+                    Copy Link
+                  </button>
+                </div>
               </div>
             ))}
           </div>
