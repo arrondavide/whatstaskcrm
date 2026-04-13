@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Save, Palette } from "lucide-react";
+import { useState } from "react";
+import { Save } from "lucide-react";
 import { useAppUser } from "@/hooks/queries/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -11,15 +11,18 @@ const colorPresets = ["#7C3AED", "#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#E
 export default function BrandingSettingsPage() {
   const { data: appData } = useAppUser();
   const qc = useQueryClient();
-  const [primaryColor, setPrimaryColor] = useState("#7C3AED");
-  const [theme, setTheme] = useState("dark");
+  const tenant = appData?.tenant;
+  const [primaryColor, setPrimaryColor] = useState(tenant?.primaryColor ?? "#7C3AED");
+  const [theme, setTheme] = useState(tenant?.theme ?? "dark");
 
-  useEffect(() => {
-    if (appData?.tenant) {
-      setPrimaryColor(appData.tenant.primaryColor);
-      setTheme(appData.tenant.theme);
-    }
-  }, [appData]);
+  // Reset state when tenant data loads (key-based reset alternative)
+  const tenantKey = tenant?.id ?? "";
+  const [loadedKey, setLoadedKey] = useState("");
+  if (tenant && tenantKey !== loadedKey) {
+    setPrimaryColor(tenant.primaryColor);
+    setTheme(tenant.theme);
+    setLoadedKey(tenantKey);
+  }
 
   const save = useMutation({
     mutationFn: async () => {

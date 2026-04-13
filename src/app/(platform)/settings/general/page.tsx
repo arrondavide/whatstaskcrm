@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Save } from "lucide-react";
 import { useAppUser } from "@/hooks/queries/use-auth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,18 +22,20 @@ export default function GeneralSettingsPage() {
 
   const [newStageName, setNewStageName] = useState("");
 
-  useEffect(() => {
-    if (tenant) {
-      setForm({
-        name: tenant.name,
-        recordLabel: tenant.recordLabel,
-        recordLabelSingular: tenant.recordLabelSingular,
-        documentLabel: tenant.documentLabel,
-        pipelineEnabled: tenant.pipelineConfig?.enabled ?? false,
-        stages: tenant.pipelineConfig?.stages ?? [],
-      });
-    }
-  }, [tenant]);
+  // Sync form from tenant data without useEffect
+  const tenantKey = tenant?.id ?? "";
+  const [loadedKey, setLoadedKey] = useState("");
+  if (tenant && tenantKey !== loadedKey) {
+    setForm({
+      name: tenant.name,
+      recordLabel: tenant.recordLabel,
+      recordLabelSingular: tenant.recordLabelSingular,
+      documentLabel: tenant.documentLabel,
+      pipelineEnabled: tenant.pipelineConfig?.enabled ?? false,
+      stages: tenant.pipelineConfig?.stages ?? [],
+    });
+    setLoadedKey(tenantKey);
+  }
 
   const updateTenant = useMutation({
     mutationFn: async () => {
