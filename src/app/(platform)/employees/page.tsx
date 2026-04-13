@@ -237,6 +237,27 @@ export default function EmployeesPage() {
                     <Copy size={12} />
                     Copy Link
                   </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Revoke invite for ${invite.email}?`)) return;
+                      try {
+                        const res = await fetch("/api/invites", {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: invite.id }),
+                        });
+                        const d = await res.json();
+                        if (!d.success) throw new Error(d.error?.message);
+                        qc.invalidateQueries({ queryKey: ["invites"] });
+                        toast.success("Invite revoked");
+                      } catch (err: unknown) {
+                        toast.error(err instanceof Error ? err.message : "Failed");
+                      }
+                    }}
+                    className="rounded-md p-1 text-gray-500 hover:bg-red-900/30 hover:text-red-400"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             ))}

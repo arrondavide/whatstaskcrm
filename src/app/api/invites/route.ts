@@ -68,3 +68,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   return success(invite, 201);
 });
+
+// DELETE /api/invites — Revoke a pending invite
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
+  const auth = await withAuth(request);
+  const { id } = await request.json();
+
+  await db
+    .delete(invites)
+    .where(and(eq(invites.id, id), eq(invites.tenantId, auth.tenantId)));
+
+  return success({ deleted: true });
+});
