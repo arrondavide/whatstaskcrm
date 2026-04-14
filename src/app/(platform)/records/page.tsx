@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRecords, useDeleteRecord, useCreateRecord } from "@/hooks/queries/use-records";
 import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
+import { FieldInput, FieldValueDisplay } from "@/components/records/field-input";
 import { useFilterStore } from "@/stores/filter-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { hasPermission } from "@/lib/permissions";
@@ -18,7 +19,7 @@ export default function RecordsPage() {
   const { search, setSearch } = useFilterStore();
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
-  const [newData, setNewData] = useState<Record<string, string>>({});
+  const [newData, setNewData] = useState<Record<string, unknown>>({});
 
   const { data: fieldsData } = useFields();
   const { data, isLoading } = useRecords({ page, search: search || undefined });
@@ -156,32 +157,11 @@ export default function RecordsPage() {
                       {field.label}
                       {field.required && <span className="text-red-400"> *</span>}
                     </label>
-                    {field.type === "textarea" ? (
-                      <textarea
-                        value={newData[field.id] ?? ""}
-                        onChange={(e) => setNewData({ ...newData, [field.id]: e.target.value })}
-                        rows={3}
-                        className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-                      />
-                    ) : field.type === "boolean" ? (
-                      <label className="mt-1 flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={newData[field.id] === "true"}
-                          onChange={(e) => setNewData({ ...newData, [field.id]: String(e.target.checked) })}
-                          className="rounded border-gray-600"
-                        />
-                        <span className="text-sm text-gray-300">Yes</span>
-                      </label>
-                    ) : (
-                      <input
-                        type={field.type === "number" || field.type === "currency" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text"}
-                        value={newData[field.id] ?? ""}
-                        onChange={(e) => setNewData({ ...newData, [field.id]: e.target.value })}
-                        placeholder={field.label}
-                        className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
-                      />
-                    )}
+                    <FieldInput
+                      field={field}
+                      value={newData[field.id]}
+                      onChange={(val) => setNewData({ ...newData, [field.id]: val })}
+                    />
                   </div>
                 ))
               )}
@@ -258,8 +238,8 @@ export default function RecordsPage() {
                     />
                   </td>
                   {tableFields.map((f) => (
-                    <td key={f.id} className="max-w-[200px] truncate px-4 py-3 text-gray-300">
-                      {String(record.data[f.id] ?? "—")}
+                    <td key={f.id} className="max-w-[200px] px-4 py-3 text-gray-300">
+                      <FieldValueDisplay field={f} value={record.data[f.id]} />
                     </td>
                   ))}
                   <td className="px-4 py-3 text-gray-400">

@@ -6,7 +6,7 @@ import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { useRecord, useUpdateRecord, useDeleteRecord } from "@/hooks/queries/use-records";
 import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
-import toast from "react-hot-toast";
+import { FieldInput, FieldValueDisplay } from "@/components/records/field-input";
 
 export default function RecordDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -16,7 +16,7 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
   const { data: appData } = useAppUser();
   const updateRecord = useUpdateRecord();
   const deleteRecord = useDeleteRecord();
-  const [editData, setEditData] = useState<Record<string, string> | null>(null);
+  const [editData, setEditData] = useState<Record<string, unknown> | null>(null);
 
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center text-gray-500">Loading...</div>;
@@ -27,15 +27,10 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
   }
 
   const isEditing = editData !== null;
-  const currentData = isEditing ? editData : (record.data as Record<string, string>);
 
   const handleSave = () => {
     if (!editData) return;
-    const data: Record<string, unknown> = {};
-    (fields ?? []).forEach((f) => {
-      if (editData[f.id] !== undefined) data[f.id] = editData[f.id];
-    });
-    updateRecord.mutate({ id, data }, {
+    updateRecord.mutate({ id, data: editData }, {
       onSuccess: () => setEditData(null),
     });
   };
@@ -82,7 +77,7 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
           ) : (
             <>
               <button
-                onClick={() => setEditData(record.data as Record<string, string>)}
+                onClick={() => setEditData({ ...(record.data as Record<string, unknown>) })}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
               >
                 Edit
@@ -100,30 +95,20 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="rounded-xl border border-gray-800 bg-gray-900 p-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2">
           {(fields ?? []).map((field) => (
-            <div key={field.id}>
+            <div key={field.id} className={field.type === "textarea" || field.type === "file" ? "sm:col-span-2" : ""}>
               <label className="block text-sm font-medium text-gray-400">{field.label}</label>
               {isEditing ? (
-                field.type === "textarea" ? (
-                  <textarea
-                    value={currentData[field.id] ?? ""}
-                    onChange={(e) => setEditData({ ...editData!, [field.id]: e.target.value })}
-                    rows={3}
-                    className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
-                  />
-                ) : (
-                  <input
-                    type={field.type === "number" || field.type === "currency" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text"}
-                    value={currentData[field.id] ?? ""}
-                    onChange={(e) => setEditData({ ...editData!, [field.id]: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white focus:border-violet-500 focus:outline-none"
-                  />
-                )
+                <FieldInput
+                  field={field}
+                  value={editData[field.id]}
+                  onChange={(val) => setEditData({ ...editData!, [field.id]: val })}
+                />
               ) : (
-                <p className="mt-1 text-sm text-white">
-                  {String(currentData[field.id] ?? "—")}
-                </p>
+                <div className="mt-1 text-sm text-white">
+                  <FieldValueDisplay field={field} value={(record.data as Record<string, unknown>)[field.id]} />
+                </div>
               )}
             </div>
           ))}
