@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, Trash2, Eye, Download } from "lucide-react";
+import { Plus, Search, Trash2, Eye, Download, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRecords, useDeleteRecord, useCreateRecord } from "@/hooks/queries/use-records";
 import { useFields } from "@/hooks/queries/use-fields";
@@ -22,6 +22,8 @@ export default function RecordsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [newData, setNewData] = useState<Record<string, unknown>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [filterGroup, setFilterGroup] = useState<FilterGroup>({ match: "all", filters: [] });
@@ -162,6 +164,15 @@ export default function RecordsPage() {
               className="w-56 rounded-lg border border-gray-700 bg-gray-800 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
             />
           </div>
+          {canCreate && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-2 rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800"
+            >
+              <Upload size={16} />
+              Import
+            </button>
+          )}
           {canExport && (
             <button
               onClick={handleExport}
@@ -241,6 +252,79 @@ export default function RecordsPage() {
           >
             Clear selection
           </button>
+        </div>
+      )}
+
+      {/* Import modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-700 bg-gray-900 p-6">
+            <h2 className="text-lg font-bold text-white">Import from CSV</h2>
+            <p className="mt-1 text-sm text-gray-400">
+              Upload a CSV file. Column headers must match your field labels exactly.
+            </p>
+
+            <div className="mt-4 rounded-lg border border-gray-700 bg-gray-800 p-3">
+              <p className="text-xs font-medium text-gray-300">Your field labels:</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {fields.map((f) => (
+                  <span key={f.id} className="rounded-full bg-gray-700 px-2 py-0.5 text-[10px] text-gray-300">
+                    {f.label}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] text-gray-500">
+                For multi-select fields, separate values with semicolons (;). Boolean fields accept: true/yes/1.
+              </p>
+            </div>
+
+            <div className="mt-4">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setImporting(true);
+                  try {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    const res = await fetch("/api/import", { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (!data.success) {
+                      toast.error(data.error?.message ?? "Import failed");
+                    } else {
+                      toast.success(`Imported ${data.data.imported} records`);
+                      if (data.data.unmappedHeaders?.length > 0) {
+                        toast(`Skipped columns: ${data.data.unmappedHeaders.join(", ")}`, { icon: "⚠️" });
+                      }
+                      qc.invalidateQueries({ queryKey: ["records"] });
+                      setShowImport(false);
+                    }
+                  } catch {
+                    toast.error("Import failed");
+                  } finally {
+                    setImporting(false);
+                  }
+                }}
+                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-300 file:mr-3 file:rounded-md file:border-0 file:bg-violet-600 file:px-3 file:py-1 file:text-sm file:font-medium file:text-white hover:file:bg-violet-700"
+                disabled={importing}
+              />
+              {importing && (
+                <p className="mt-2 text-sm text-violet-400">Importing...</p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowImport(false)}
+                disabled={importing}
+                className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
