@@ -51,7 +51,7 @@ export const users = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    authUid: text("auth_uid").unique().notNull(), // Supabase Auth user ID
+    authUid: text("auth_uid").notNull(), // Supabase Auth user ID
     email: text("email").notNull(),
     name: text("name").notNull(),
     avatarUrl: text("avatar_url"),
@@ -67,6 +67,7 @@ export const users = pgTable(
   },
   (table) => [
     unique("users_tenant_email").on(table.tenantId, table.email),
+    unique("users_tenant_auth_uid").on(table.tenantId, table.authUid),
     index("idx_users_tenant").on(table.tenantId),
     index("idx_users_auth_uid").on(table.authUid),
     index("idx_users_email").on(table.email),
