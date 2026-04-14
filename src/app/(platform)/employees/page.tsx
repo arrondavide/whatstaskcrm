@@ -75,7 +75,7 @@ export default function EmployeesPage() {
           <h1 className="text-2xl font-bold text-white">Team</h1>
           <p className="text-sm text-gray-400">{users?.length ?? 0} members</p>
         </div>
-        {appData?.user?.permissions?.["users.invite"] && (
+        {(appData?.user?.permissions?.["users.invite"] || appData?.user?.role === "admin") && (
           <button
             onClick={() => setShowInvite(true)}
             className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
@@ -147,7 +147,7 @@ export default function EmployeesPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {appData?.user?.permissions?.["users.manage"] && u.id !== appData?.user?.id ? (
+                {(appData?.user?.permissions?.["users.manage"] || appData?.user?.role === "admin") && u.id !== appData?.user?.id ? (
                   <select
                     value={u.role}
                     onChange={async (e) => {
@@ -180,7 +180,7 @@ export default function EmployeesPage() {
                 <span className={`text-xs ${u.status === "active" ? "text-green-400" : "text-gray-500"}`}>
                   {u.status}
                 </span>
-                {appData?.user?.permissions?.["users.remove"] && u.id !== appData?.user?.id && (
+                {(appData?.user?.permissions?.["users.remove"] || appData?.user?.role === "admin") && u.id !== appData?.user?.id && (
                   <button
                     onClick={async () => {
                       if (!confirm(`Remove ${u.name} from the workspace?`)) return;
