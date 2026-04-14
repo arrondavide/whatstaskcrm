@@ -3,8 +3,8 @@ import { withAuth, withValidation, withErrorHandler } from "@/lib/api/middleware
 import { success } from "@/lib/api/response";
 import { db } from "@/db";
 import { records, activity } from "@/db/schema";
-import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
 import { createRecordSchema } from "@/validators/record";
+import { queryRecords } from "@/lib/api/query-builder";
 
 // GET /api/records — List records with pagination, search, filters
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -13,54 +13,36 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   const page = Math.max(1, Number(searchParams.get("page") ?? 1));
   const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize") ?? 50)));
-  const search = searchParams.get("search") ?? "";
-  const sortField = searchParams.get("sortField") ?? "createdAt";
-  const sortDir = searchParams.get("sortDir") === "asc" ? "asc" : "desc";
-  const stage = searchParams.get("stage");
-  const assignedTo = searchParams.get("assignedTo");
+  const search = searchParams.get("search") || undefined;
+  const sortField = searchParams.get("sortField") || undefined;
+  const sortDir = (searchParams.get("sortDir") === "asc" ? "asc" : "desc") as "asc" | "desc";
+  const stage = searchParams.get("stage") || undefined;
+  const assignedTo = searchParams.get("assignedTo") || undefined;
 
-  const conditions = [
-    eq(records.tenantId, auth.tenantId),
-    eq(records.deleted, false),
-  ];
-
-  if (stage) conditions.push(eq(records.pipelineStage, stage));
-  if (assignedTo) conditions.push(eq(records.assignedTo, assignedTo));
-
-  const where = and(...conditions);
-
-  // Build search condition using full-text search vector
-  let searchWhere = where;
-  if (search) {
-    searchWhere = and(
-      where,
-      sql`search_vector @@ plainto_tsquery('english', ${search})`
-    );
+  // Parse filters JSON from query param
+  let filters;
+  const filtersParam = searchParams.get("filters");
+  if (filtersParam) {
+    try {
+      filters = JSON.parse(filtersParam);
+    } catch {
+      // ignore invalid JSON
+    }
   }
 
-  const [items, countResult] = await Promise.all([
-    db
-      .select()
-      .from(records)
-      .where(searchWhere!)
-      .orderBy(sortDir === "asc" ? sql`${records.createdAt} ASC` : desc(records.createdAt))
-      .limit(pageSize)
-      .offset((page - 1) * pageSize),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(records)
-      .where(searchWhere!),
-  ]);
-
-  const total = Number(countResult[0].count);
-
-  return success({
-    items,
-    total,
+  const result = await queryRecords({
+    tenantId: auth.tenantId,
+    filters,
+    search,
+    stage,
+    assignedTo,
+    sortField,
+    sortDir,
     page,
     pageSize,
-    totalPages: Math.ceil(total / pageSize),
   });
+
+  return success(result);
 });
 
 // POST /api/records — Create a new record

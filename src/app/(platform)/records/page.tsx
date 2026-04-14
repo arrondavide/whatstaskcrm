@@ -8,26 +8,82 @@ import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
 import { FieldInput, FieldValueDisplay } from "@/components/records/field-input";
 import { validateRecordData } from "@/lib/validate-record";
-import { useFilterStore } from "@/stores/filter-store";
 import { useSelectionStore } from "@/stores/selection-store";
+import { FilterBuilder, QuickFilters, SavedViewsBar } from "@/components/records/filter-builder";
 import { hasPermission } from "@/lib/permissions";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PermissionKey } from "@/types";
+
+type FilterGroup = { match: "all" | "any"; filters: { fieldId: string; operator: string; value: unknown }[] };
 import toast from "react-hot-toast";
 
 export default function RecordsPage() {
   const { data: appData } = useAppUser();
-  const { search, setSearch } = useFilterStore();
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [newData, setNewData] = useState<Record<string, unknown>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [filterGroup, setFilterGroup] = useState<FilterGroup>({ match: "all", filters: [] });
+  const [activeStage, setActiveStage] = useState<string | null>(null);
+  const [assignedToMe, setAssignedToMe] = useState(false);
+  const [sortField, setSortField] = useState<string | undefined>();
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
 
   const { data: fieldsData } = useFields();
-  const { data, isLoading } = useRecords({ page, search: search || undefined });
+  const { data, isLoading } = useRecords({
+    page,
+    search: search || undefined,
+    stage: activeStage || undefined,
+    assignedTo: assignedToMe ? appData?.user?.id : undefined,
+    sortField,
+    sortDir,
+    filters: filterGroup.filters.length > 0 ? filterGroup : undefined,
+  });
   const deleteRecord = useDeleteRecord();
   const createRecord = useCreateRecord();
   const { selectedIds, toggle, deselectAll } = useSelectionStore();
+
+  // Saved views
+  const { data: savedViews } = useQuery({
+    queryKey: ["views"],
+    queryFn: async () => {
+      const res = await fetch("/api/views");
+      const d = await res.json();
+      return (d.data ?? []) as { id: string; name: string; filters: FilterGroup; pinned: boolean }[];
+    },
+  });
+
+  const saveView = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/views", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, filters: filterGroup }),
+      });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error?.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["views"] });
+      toast.success("View saved");
+    },
+  });
+
+  const deleteView = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch("/api/views", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["views"] });
+      if (activeViewId) setActiveViewId(null);
+    },
+  });
 
   const fields = fieldsData ?? [];
   const tableFields = fields.filter((f) => f.showInTable);
@@ -125,6 +181,41 @@ export default function RecordsPage() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* Saved views bar */}
+      <SavedViewsBar
+        views={savedViews ?? []}
+        activeViewId={activeViewId}
+        onSelectView={(view) => {
+          if (view) {
+            setFilterGroup(view.filters);
+            setActiveViewId(view.id);
+          } else {
+            setFilterGroup({ match: "all", filters: [] });
+            setActiveViewId(null);
+          }
+          setPage(1);
+        }}
+        onDeleteView={(id) => deleteView.mutate(id)}
+      />
+
+      {/* Quick filters + Filter builder */}
+      <div className="mb-4 space-y-3">
+        <QuickFilters
+          fields={fields}
+          pipelineStages={tenant?.pipelineConfig?.stages}
+          activeStage={activeStage}
+          onStageChange={(s) => { setActiveStage(s); setPage(1); }}
+          assignedToMe={assignedToMe}
+          onAssignedToMeChange={(v) => { setAssignedToMe(v); setPage(1); }}
+        />
+        <FilterBuilder
+          fields={fields}
+          filterGroup={filterGroup}
+          onChange={(g) => { setFilterGroup(g); setPage(1); }}
+          onSaveView={(name) => saveView.mutate(name)}
+        />
       </div>
 
       {/* Bulk action bar */}
@@ -229,11 +320,40 @@ export default function RecordsPage() {
                 />
               </th>
               {tableFields.map((f) => (
-                <th key={f.id} className="px-4 py-3 font-medium text-gray-400">
+                <th
+                  key={f.id}
+                  className="cursor-pointer px-4 py-3 font-medium text-gray-400 hover:text-white select-none"
+                  onClick={() => {
+                    if (sortField === f.id) {
+                      setSortDir(sortDir === "asc" ? "desc" : "asc");
+                    } else {
+                      setSortField(f.id);
+                      setSortDir("asc");
+                    }
+                    setPage(1);
+                  }}
+                >
                   {f.label}
+                  {sortField === f.id && (
+                    <span className="ml-1 text-violet-400">{sortDir === "asc" ? "↑" : "↓"}</span>
+                  )}
                 </th>
               ))}
-              <th className="px-4 py-3 font-medium text-gray-400">Created</th>
+              <th
+                className="cursor-pointer px-4 py-3 font-medium text-gray-400 hover:text-white select-none"
+                onClick={() => {
+                  if (!sortField || sortField === "createdAt") {
+                    setSortDir(sortDir === "asc" ? "desc" : "asc");
+                  }
+                  setSortField(undefined);
+                  setPage(1);
+                }}
+              >
+                Created
+                {(!sortField || sortField === "createdAt") && (
+                  <span className="ml-1 text-violet-400">{sortDir === "asc" ? "↑" : "↓"}</span>
+                )}
+              </th>
               <th className="px-4 py-3 font-medium text-gray-400">Actions</th>
             </tr>
           </thead>

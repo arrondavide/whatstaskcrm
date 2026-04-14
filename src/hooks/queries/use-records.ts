@@ -28,6 +28,9 @@ export function useRecords(params?: {
   search?: string;
   stage?: string;
   assignedTo?: string;
+  sortField?: string;
+  sortDir?: "asc" | "desc";
+  filters?: { match: string; filters: unknown[] };
 }) {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -35,6 +38,11 @@ export function useRecords(params?: {
   if (params?.search) query.set("search", params.search);
   if (params?.stage) query.set("stage", params.stage);
   if (params?.assignedTo) query.set("assignedTo", params.assignedTo);
+  if (params?.sortField) query.set("sortField", params.sortField);
+  if (params?.sortDir) query.set("sortDir", params.sortDir);
+  if (params?.filters && params.filters.filters.length > 0) {
+    query.set("filters", JSON.stringify(params.filters));
+  }
 
   return useQuery<PaginatedRecords>({
     queryKey: ["records", params],
