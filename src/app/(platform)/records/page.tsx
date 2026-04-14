@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, Trash2, Eye, Download, Upload } from "lucide-react";
+import { Plus, Search, Trash2, Eye, Download, Upload, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRecords, useDeleteRecord, useCreateRecord } from "@/hooks/queries/use-records";
 import { useFields } from "@/hooks/queries/use-fields";
@@ -24,6 +24,8 @@ export default function RecordsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [duplicates, setDuplicates] = useState<{ id: string; data: Record<string, unknown>; duplicateScore: number; matchedFields: string[] }[]>([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
   const [newData, setNewData] = useState<Record<string, unknown>>({});
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [filterGroup, setFilterGroup] = useState<FilterGroup>({ match: "all", filters: [] });
@@ -120,7 +122,24 @@ export default function RecordsPage() {
     window.open("/api/export", "_blank");
   };
 
-  const handleCreate = () => {
+  const doCreate = () => {
+    const recordData: Record<string, unknown> = {};
+    fields.forEach((f) => {
+      const val = newData[f.id];
+      if (val !== undefined && val !== null && val !== "") recordData[f.id] = val;
+    });
+    createRecord.mutate({ data: recordData }, {
+      onSuccess: () => {
+        setShowCreate(false);
+        setNewData({});
+        setFormErrors({});
+        setDuplicates([]);
+        setShowDuplicates(false);
+      },
+    });
+  };
+
+  const handleCreate = async () => {
     // Validate
     const errors = validateRecordData(newData, fields);
     if (errors.length > 0) {
@@ -132,18 +151,20 @@ export default function RecordsPage() {
     }
     setFormErrors({});
 
-    const recordData: Record<string, unknown> = {};
-    fields.forEach((f) => {
-      const val = newData[f.id];
-      if (val !== undefined && val !== null && val !== "") recordData[f.id] = val;
-    });
-    createRecord.mutate({ data: recordData }, {
-      onSuccess: () => {
-        setShowCreate(false);
-        setNewData({});
-        setFormErrors({});
-      },
-    });
+    // Check for duplicates
+    try {
+      const res = await fetch(`/api/records/duplicates?data=${encodeURIComponent(JSON.stringify(newData))}`);
+      const d = await res.json();
+      if (d.success && d.data.length > 0) {
+        setDuplicates(d.data);
+        setShowDuplicates(true);
+        return; // Show duplicate warning instead of creating
+      }
+    } catch {
+      // If duplicate check fails, just create
+    }
+
+    doCreate();
   };
 
   return (
@@ -252,6 +273,59 @@ export default function RecordsPage() {
           >
             Clear selection
           </button>
+        </div>
+      )}
+
+      {/* Duplicate warning modal */}
+      {showDuplicates && duplicates.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-amber-800 bg-gray-900 p-6">
+            <div className="flex items-center gap-2 text-amber-400">
+              <AlertTriangle size={20} />
+              <h2 className="text-lg font-bold">Possible Duplicates Found</h2>
+            </div>
+            <p className="mt-2 text-sm text-gray-400">
+              We found {duplicates.length} record(s) that may already exist:
+            </p>
+            <div className="mt-4 max-h-48 space-y-2 overflow-y-auto">
+              {duplicates.map((dup) => {
+                const firstField = fields.find((f) => f.showInTable);
+                return (
+                  <div key={dup.id} className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-800 p-3">
+                    <div>
+                      <p className="text-sm font-medium text-white">
+                        {firstField ? String(dup.data[firstField.id] ?? "Untitled") : dup.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-amber-400/70">
+                        Matched: {dup.matchedFields.join(", ")} ({dup.duplicateScore}% match)
+                      </p>
+                    </div>
+                    <a
+                      href={`/records/${dup.id}`}
+                      target="_blank"
+                      className="text-xs text-violet-400 hover:text-violet-300"
+                    >
+                      View
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowDuplicates(false); setDuplicates([]); }}
+                className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => { setShowDuplicates(false); doCreate(); }}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              >
+                Create Anyway
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

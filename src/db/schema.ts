@@ -291,6 +291,81 @@ export const templates = pgTable("templates", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
+// ── LINKED RECORDS ──────────────────────────────────
+
+export const recordLinks = pgTable(
+  "record_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => records.id, { onDelete: "cascade" }),
+    targetRecordId: uuid("target_record_id")
+      .notNull()
+      .references(() => records.id, { onDelete: "cascade" }),
+    linkType: text("link_type").default("related"), // related, parent, child
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_record_links_source").on(table.sourceRecordId),
+    index("idx_record_links_target").on(table.targetRecordId),
+  ]
+);
+
+// ── RECORD REVISIONS ──────────────────────────────────
+
+export const recordRevisions = pgTable(
+  "record_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => records.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull(),
+    changes: jsonb("changes").$type<Record<string, { old: unknown; new: unknown }>>(),
+    changedBy: text("changed_by").notNull(),
+    changedByName: text("changed_by_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_revisions_record").on(table.recordId, table.version),
+  ]
+);
+
+// ── RECORD COMMENTS ──────────────────────────────────
+
+export const recordComments = pgTable(
+  "record_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    recordId: uuid("record_id")
+      .notNull()
+      .references(() => records.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"), // for threaded replies
+    content: text("content").notNull(),
+    authorId: text("author_id").notNull(),
+    authorName: text("author_name").notNull(),
+    edited: boolean("edited").default(false),
+    deleted: boolean("deleted").default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_comments_record").on(table.recordId, table.createdAt),
+  ]
+);
+
 // ── BILLING EVENTS ──────────────────────────────────
 
 export const billingEvents = pgTable("billing_events", {

@@ -138,6 +138,13 @@ export function FieldInput({ field, value, onChange }: FieldInputProps) {
     case "file":
       return <FileInput value={value} onChange={onChange} />;
 
+    case "formula":
+      return (
+        <div className="mt-1 rounded-lg border border-gray-700 bg-gray-800/50 px-3 py-2 text-sm text-gray-400 italic">
+          Computed field — value calculated automatically
+        </div>
+      );
+
     default:
       return (
         <input

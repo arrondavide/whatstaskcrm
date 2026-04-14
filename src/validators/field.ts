@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const fieldTypes = [
   "text", "textarea", "number", "phone", "email", "date",
-  "select", "multi_select", "file", "url", "currency", "boolean",
+  "select", "multi_select", "file", "url", "currency", "boolean", "formula",
 ] as const;
 
 export const createFieldSchema = z.object({

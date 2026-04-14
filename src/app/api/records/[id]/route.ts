@@ -3,7 +3,7 @@ import { withAuth, withValidation, withErrorHandler } from "@/lib/api/middleware
 import { success } from "@/lib/api/response";
 import { AppError, ErrorCodes } from "@/lib/api/errors";
 import { db } from "@/db";
-import { records, activity } from "@/db/schema";
+import { records, activity, recordRevisions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { updateRecordSchema } from "@/validators/record";
 
@@ -38,6 +38,27 @@ export const PATCH = withErrorHandler(async (request: NextRequest, context: unkn
   if (!existing || existing.deleted) {
     throw new AppError(ErrorCodes.NOT_FOUND, "Record not found", 404);
   }
+
+  // Save current state as revision before updating
+  const changes: Record<string, { old: unknown; new: unknown }> = {};
+  if (body.data) {
+    const oldData = existing.data as Record<string, unknown>;
+    for (const [key, newVal] of Object.entries(body.data)) {
+      if (JSON.stringify(oldData[key]) !== JSON.stringify(newVal)) {
+        changes[key] = { old: oldData[key], new: newVal };
+      }
+    }
+  }
+
+  await db.insert(recordRevisions).values({
+    tenantId: auth.tenantId,
+    recordId: id,
+    version: existing.version ?? 1,
+    data: existing.data as Record<string, unknown>,
+    changes: Object.keys(changes).length > 0 ? changes : null,
+    changedBy: auth.authUid,
+    changedByName: auth.user.name,
+  });
 
   const [updated] = await db
     .update(records)

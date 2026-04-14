@@ -19,6 +19,7 @@ const fieldTypeLabels: Record<string, string> = {
   url: "URL",
   currency: "Currency",
   boolean: "Yes/No",
+  formula: "Formula",
 };
 
 export default function FieldsSettingsPage() {
