@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, GripVertical, Trash2, Pencil, Save, X } from "lucide-react";
+import { Plus, Trash2, Pencil, Save, X, ChevronUp, ChevronDown } from "lucide-react";
 import { useFields, useCreateField, type FieldItem } from "@/hooks/queries/use-fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -32,6 +32,44 @@ export default function FieldsSettingsPage() {
   const [editForm, setEditForm] = useState({ label: "", required: false, showInTable: true, filterable: true });
   const [options, setOptions] = useState<string[]>([""]);
   const [editOptions, setEditOptions] = useState<string[]>([]);
+  const [localOrder, setLocalOrder] = useState<FieldItem[] | null>(null);
+  const [orderDirty, setOrderDirty] = useState(false);
+
+  // Use local order if we're rearranging, otherwise use server data
+  const displayFields = localOrder ?? fields ?? [];
+
+  const reorderFields = useMutation({
+    mutationFn: async (fieldIds: string[]) => {
+      const res = await fetch("/api/fields/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldIds }),
+      });
+      const d = await res.json();
+      if (!d.success) throw new Error(d.error?.message);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fields"] });
+      setLocalOrder(null);
+      setOrderDirty(false);
+      toast.success("Field order saved");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const moveField = (index: number, direction: "up" | "down") => {
+    const arr = [...(localOrder ?? fields ?? [])];
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= arr.length) return;
+    [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+    setLocalOrder(arr);
+    setOrderDirty(true);
+  };
+
+  const saveOrder = () => {
+    if (!localOrder) return;
+    reorderFields.mutate(localOrder.map((f) => f.id));
+  };
 
   const updateField = useMutation({
     mutationFn: async ({ id, ...body }: { id: string; label?: string; required?: boolean; showInTable?: boolean; filterable?: boolean; config?: Record<string, unknown> }) => {
@@ -229,23 +267,65 @@ export default function FieldsSettingsPage() {
         </div>
       )}
 
+      {/* Save order button */}
+      {orderDirty && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-violet-800 bg-violet-900/20 px-4 py-2">
+          <span className="text-sm text-violet-300">Field order changed</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setLocalOrder(null); setOrderDirty(false); }}
+              className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={saveOrder}
+              disabled={reorderFields.isPending}
+              className="flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              <Save size={12} />
+              {reorderFields.isPending ? "Saving..." : "Save Order"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Fields list */}
       <div className="space-y-2">
         {isLoading ? (
           <div className="py-8 text-center text-gray-500">Loading fields...</div>
-        ) : !fields?.length ? (
+        ) : !displayFields.length ? (
           <div className="rounded-xl border border-dashed border-gray-700 py-12 text-center">
             <p className="text-gray-400">No fields yet. Add your first field to define your record structure.</p>
           </div>
         ) : (
-          fields.map((field) => (
+          displayFields.map((field, index) => (
             <div
               key={field.id}
               className="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-900 p-4"
             >
-              <GripVertical size={16} className="cursor-grab text-gray-600" />
+              {/* Up/Down arrows */}
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => moveField(index, "up")}
+                  disabled={index === 0}
+                  className="rounded p-0.5 text-gray-600 hover:bg-gray-800 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-gray-600"
+                  title="Move up"
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  onClick={() => moveField(index, "down")}
+                  disabled={index === displayFields.length - 1}
+                  className="rounded p-0.5 text-gray-600 hover:bg-gray-800 hover:text-white disabled:opacity-20 disabled:hover:bg-transparent disabled:hover:text-gray-600"
+                  title="Move down"
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-gray-600 w-5">{index + 1}</span>
                   <span className="font-medium text-white">{field.label}</span>
                   {field.required && (
                     <span className="rounded bg-red-900/30 px-1.5 py-0.5 text-[10px] text-red-400">Required</span>
@@ -254,7 +334,7 @@ export default function FieldsSettingsPage() {
                     <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">Hidden</span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">{fieldTypeLabels[field.type] ?? field.type} · Order: {field.fieldOrder}</p>
+                <p className="ml-5 text-xs text-gray-500">{fieldTypeLabels[field.type] ?? field.type}</p>
               </div>
               <span className="rounded-full bg-gray-800 px-2.5 py-0.5 text-xs text-gray-400">
                 {fieldTypeLabels[field.type] ?? field.type}
