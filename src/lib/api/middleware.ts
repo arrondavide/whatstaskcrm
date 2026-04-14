@@ -41,15 +41,19 @@ export async function withAuth(request: NextRequest): Promise<AuthContext> {
   }
 
   // Look up the app user by Supabase Auth UID
-  // Support multi-workspace: check for tenant_id header to switch workspace
-  const requestedTenantId = request.headers.get("x-tenant-id");
+  // Support multi-workspace: check header or cookie for active tenant
+  const requestedTenantId =
+    request.headers.get("x-tenant-id") ||
+    request.cookies.get("active_tenant_id")?.value;
 
   let appUser;
   if (requestedTenantId) {
     appUser = await db.query.users.findFirst({
       where: and(eq(users.authUid, authUser.id), eq(users.tenantId, requestedTenantId)),
     });
-  } else {
+  }
+  // Fallback: if no tenant specified or user not found in that tenant, use most recent
+  if (!appUser) {
     appUser = await db.query.users.findFirst({
       where: eq(users.authUid, authUser.id),
       orderBy: (u, { desc }) => [desc(u.lastActive)],
