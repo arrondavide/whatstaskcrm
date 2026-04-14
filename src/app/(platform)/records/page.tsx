@@ -7,6 +7,7 @@ import { useRecords, useDeleteRecord, useCreateRecord } from "@/hooks/queries/us
 import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
 import { FieldInput, FieldValueDisplay } from "@/components/records/field-input";
+import { validateRecordData } from "@/lib/validate-record";
 import { useFilterStore } from "@/stores/filter-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { hasPermission } from "@/lib/permissions";
@@ -20,6 +21,7 @@ export default function RecordsPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [newData, setNewData] = useState<Record<string, unknown>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const { data: fieldsData } = useFields();
   const { data, isLoading } = useRecords({ page, search: search || undefined });
@@ -61,14 +63,27 @@ export default function RecordsPage() {
   };
 
   const handleCreate = () => {
+    // Validate
+    const errors = validateRecordData(newData, fields);
+    if (errors.length > 0) {
+      const errorMap: Record<string, string> = {};
+      errors.forEach((e) => { errorMap[e.fieldId] = e.message; });
+      setFormErrors(errorMap);
+      toast.error(errors[0].message);
+      return;
+    }
+    setFormErrors({});
+
     const recordData: Record<string, unknown> = {};
     fields.forEach((f) => {
-      if (newData[f.id]) recordData[f.id] = newData[f.id];
+      const val = newData[f.id];
+      if (val !== undefined && val !== null && val !== "") recordData[f.id] = val;
     });
     createRecord.mutate({ data: recordData }, {
       onSuccess: () => {
         setShowCreate(false);
         setNewData({});
+        setFormErrors({});
       },
     });
   };
@@ -160,8 +175,18 @@ export default function RecordsPage() {
                     <FieldInput
                       field={field}
                       value={newData[field.id]}
-                      onChange={(val) => setNewData({ ...newData, [field.id]: val })}
+                      onChange={(val) => {
+                        setNewData({ ...newData, [field.id]: val });
+                        if (formErrors[field.id]) {
+                          const next = { ...formErrors };
+                          delete next[field.id];
+                          setFormErrors(next);
+                        }
+                      }}
                     />
+                    {formErrors[field.id] && (
+                      <p className="mt-1 text-xs text-red-400">{formErrors[field.id]}</p>
+                    )}
                   </div>
                 ))
               )}

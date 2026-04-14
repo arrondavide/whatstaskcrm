@@ -7,6 +7,8 @@ import { useRecord, useUpdateRecord, useDeleteRecord } from "@/hooks/queries/use
 import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
 import { FieldInput, FieldValueDisplay } from "@/components/records/field-input";
+import { validateRecordData } from "@/lib/validate-record";
+import toast from "react-hot-toast";
 
 export default function RecordDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -17,6 +19,7 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
   const updateRecord = useUpdateRecord();
   const deleteRecord = useDeleteRecord();
   const [editData, setEditData] = useState<Record<string, unknown> | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center text-gray-500">Loading...</div>;
@@ -30,8 +33,17 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
 
   const handleSave = () => {
     if (!editData) return;
+    const errors = validateRecordData(editData, fields ?? []);
+    if (errors.length > 0) {
+      const errorMap: Record<string, string> = {};
+      errors.forEach((e) => { errorMap[e.fieldId] = e.message; });
+      setFormErrors(errorMap);
+      toast.error(errors[0].message);
+      return;
+    }
+    setFormErrors({});
     updateRecord.mutate({ id, data: editData }, {
-      onSuccess: () => setEditData(null),
+      onSuccess: () => { setEditData(null); setFormErrors({}); },
     });
   };
 
@@ -98,13 +110,28 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
         <div className="grid gap-5 sm:grid-cols-2">
           {(fields ?? []).map((field) => (
             <div key={field.id} className={field.type === "textarea" || field.type === "file" ? "sm:col-span-2" : ""}>
-              <label className="block text-sm font-medium text-gray-400">{field.label}</label>
+              <label className="block text-sm font-medium text-gray-400">
+                {field.label}
+                {field.required && <span className="text-red-400"> *</span>}
+              </label>
               {isEditing ? (
-                <FieldInput
-                  field={field}
-                  value={editData[field.id]}
-                  onChange={(val) => setEditData({ ...editData!, [field.id]: val })}
-                />
+                <>
+                  <FieldInput
+                    field={field}
+                    value={editData[field.id]}
+                    onChange={(val) => {
+                      setEditData({ ...editData!, [field.id]: val });
+                      if (formErrors[field.id]) {
+                        const next = { ...formErrors };
+                        delete next[field.id];
+                        setFormErrors(next);
+                      }
+                    }}
+                  />
+                  {formErrors[field.id] && (
+                    <p className="mt-1 text-xs text-red-400">{formErrors[field.id]}</p>
+                  )}
+                </>
               ) : (
                 <div className="mt-1 text-sm text-white">
                   <FieldValueDisplay field={field} value={(record.data as Record<string, unknown>)[field.id]} />
