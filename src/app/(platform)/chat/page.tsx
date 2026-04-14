@@ -380,95 +380,116 @@ export default function ChatPage() {
                   {messages?.map((msg, i) => {
                     const isMe = msg.senderId === currentUserId;
                     const prevMsg = messages[i - 1];
-                    const showAvatar = !prevMsg || prevMsg.senderId !== msg.senderId ||
-                      new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() > 300000;
-                    const isEditing = editingMessage === msg.id;
+                    const sameAsPrev = prevMsg && prevMsg.senderId === msg.senderId &&
+                      new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() < 300000;
+                    const isEditingMsg = editingMessage === msg.id;
 
                     if (msg.deleted) {
                       return (
-                        <div key={msg.id} className="px-12 py-0.5">
-                          <p className="text-xs italic text-gray-600">Message deleted</p>
+                        <div key={msg.id} className="flex justify-center py-0.5">
+                          <p className="text-[10px] italic text-gray-600">Message deleted</p>
                         </div>
                       );
                     }
 
                     return (
-                      <div key={msg.id} className={`group flex gap-3 ${showAvatar ? "mt-3" : ""} ${isMe ? "" : ""}`}>
-                        {/* Avatar */}
-                        <div className="w-8 flex-shrink-0">
-                          {showAvatar && (
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium text-white ${getAvatarColor(msg.senderName)}`}>
-                              {msg.senderName.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          {showAvatar && (
-                            <div className="mb-0.5 flex items-center gap-2">
-                              <span className="text-sm font-semibold text-white">{msg.senderName}</span>
-                              <span className="text-[10px] text-gray-600">{formatTime(msg.createdAt)}</span>
-                            </div>
-                          )}
-
-                          {isEditing ? (
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={editContent}
-                                onChange={(e) => setEditContent(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") editMessage.mutate({ messageId: msg.id, content: editContent });
-                                  if (e.key === "Escape") { setEditingMessage(null); setEditContent(""); }
-                                }}
-                                className="flex-1 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-white focus:border-violet-500 focus:outline-none"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => editMessage.mutate({ messageId: msg.id, content: editContent })}
-                                className="text-xs text-violet-400 hover:text-violet-300"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={() => { setEditingMessage(null); setEditContent(""); }}
-                                className="text-xs text-gray-500 hover:text-white"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-start gap-1">
-                              <p className="text-sm text-gray-200 leading-relaxed">
-                                {msg.content}
-                                {msg.edited && <span className="ml-1 text-[10px] text-gray-600">(edited)</span>}
-                              </p>
-
-                              {/* Message actions — show on hover */}
-                              {(isMe || isAdmin) && (
-                                <div className="ml-auto hidden flex-shrink-0 gap-0.5 group-hover:flex">
-                                  {isMe && (
-                                    <button
-                                      onClick={() => { setEditingMessage(msg.id); setEditContent(msg.content); }}
-                                      className="rounded p-1 text-gray-600 hover:bg-gray-800 hover:text-white"
-                                    >
-                                      <Pencil size={12} />
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      if (confirm("Delete this message?")) {
-                                        editMessage.mutate({ messageId: msg.id, deleted: true });
-                                      }
-                                    }}
-                                    className="rounded p-1 text-gray-600 hover:bg-red-900/30 hover:text-red-400"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
+                      <div
+                        key={msg.id}
+                        className={`group flex ${isMe ? "justify-end" : "justify-start"} ${sameAsPrev ? "mt-0.5" : "mt-3"}`}
+                      >
+                        <div className={`flex max-w-[75%] gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
+                          {/* Avatar — only for others, only on first in group */}
+                          {!isMe && (
+                            <div className="w-8 flex-shrink-0">
+                              {!sameAsPrev && (
+                                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium text-white ${getAvatarColor(msg.senderName)}`}>
+                                  {msg.senderName.charAt(0).toUpperCase()}
                                 </div>
                               )}
                             </div>
                           )}
+
+                          <div className="min-w-0">
+                            {/* Sender name — only for others, only on first in group */}
+                            {!isMe && !sameAsPrev && (
+                              <div className="mb-1 flex items-center gap-2 pl-1">
+                                <span className="text-xs font-semibold text-violet-400">{msg.senderName}</span>
+                                <span className="text-[10px] text-gray-600">{formatTime(msg.createdAt)}</span>
+                              </div>
+                            )}
+
+                            {isEditingMsg ? (
+                              <div className="flex gap-2 rounded-xl bg-gray-800 p-2">
+                                <input
+                                  type="text"
+                                  value={editContent}
+                                  onChange={(e) => setEditContent(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") editMessage.mutate({ messageId: msg.id, content: editContent });
+                                    if (e.key === "Escape") { setEditingMessage(null); setEditContent(""); }
+                                  }}
+                                  className="flex-1 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-white focus:border-violet-500 focus:outline-none"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => editMessage.mutate({ messageId: msg.id, content: editContent })}
+                                  className="text-xs text-violet-400 hover:text-violet-300"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => { setEditingMessage(null); setEditContent(""); }}
+                                  className="text-xs text-gray-500"
+                                >
+                                  Esc
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <div
+                                  className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                                    isMe
+                                      ? "bg-violet-600 text-white rounded-tr-sm"
+                                      : "bg-gray-800 text-gray-200 rounded-tl-sm"
+                                  }`}
+                                >
+                                  {msg.content}
+                                  <span className={`ml-2 inline-block text-[10px] align-bottom ${
+                                    isMe ? "text-violet-300" : "text-gray-500"
+                                  }`}>
+                                    {formatTime(msg.createdAt)}
+                                    {msg.edited && " · edited"}
+                                  </span>
+                                </div>
+
+                                {/* Hover actions */}
+                                {(isMe || isAdmin) && (
+                                  <div className={`absolute top-0 hidden gap-0.5 group-hover:flex ${
+                                    isMe ? "-left-14" : "-right-14"
+                                  }`}>
+                                    {isMe && (
+                                      <button
+                                        onClick={() => { setEditingMessage(msg.id); setEditContent(msg.content); }}
+                                        className="rounded-full bg-gray-800 p-1.5 text-gray-500 hover:text-white shadow"
+                                      >
+                                        <Pencil size={11} />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        if (confirm("Delete this message?")) {
+                                          editMessage.mutate({ messageId: msg.id, deleted: true });
+                                        }
+                                      }}
+                                      className="rounded-full bg-gray-800 p-1.5 text-gray-500 hover:text-red-400 shadow"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
