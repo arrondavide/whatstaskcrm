@@ -59,10 +59,10 @@ export default function EmployeesPage() {
       // Copy invite link to clipboard
       const inviteLink = `${window.location.origin}/invite/${result.id}`;
       navigator.clipboard.writeText(inviteLink).then(() => {
-        toast.success("Invite created! Link copied to clipboard. Email sent.");
+        toast.success("Invite created! Link copied — share it via WhatsApp or email.");
       }).catch(() => {
-        toast.success("Invite created! Email sent.");
-        prompt("Copy this invite link:", inviteLink);
+        toast.success("Invite created!");
+        prompt("Copy this invite link and share it:", inviteLink);
       });
     },
     onError: (err: Error) => toast.error(err.message),

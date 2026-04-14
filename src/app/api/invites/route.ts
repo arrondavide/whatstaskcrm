@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { invites, activity, tenants } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createInviteSchema } from "@/validators/invite";
-import { sendInviteEmail } from "@/lib/email";
 
 // GET /api/invites — List pending invites
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -53,17 +52,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     entityType: "invite",
     entityId: invite.id,
     entityName: body.email,
-  });
-
-  // Send invite email
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const inviteLink = `${appUrl}/invite/${invite.id}`;
-  await sendInviteEmail({
-    to: body.email,
-    inviterName: auth.user.name,
-    tenantName: tenant?.name ?? "your workspace",
-    role: body.role,
-    inviteLink,
   });
 
   return success(invite, 201);
