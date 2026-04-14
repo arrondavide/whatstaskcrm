@@ -223,6 +223,8 @@ export const chatRooms = pgTable(
     name: text("name"),
     recordId: uuid("record_id").references(() => records.id, { onDelete: "set null" }),
     participants: text("participants").array().notNull(),
+    isPublic: boolean("is_public").default(false),
+    createdBy: text("created_by"),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   },
