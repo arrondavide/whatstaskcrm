@@ -49,12 +49,12 @@ export async function POST(request: NextRequest) {
       throw new AppError(ErrorCodes.INVITE_EXPIRED, "Invite has expired", 410);
     }
 
-    // Check user doesn't already exist in this tenant
+    // Check user doesn't already exist in THIS tenant
     const existingUser = await db.query.users.findFirst({
-      where: eq(users.authUid, authUser.id),
+      where: and(eq(users.authUid, authUser.id), eq(users.tenantId, invite.tenantId)),
     });
     if (existingUser) {
-      throw new AppError(ErrorCodes.DUPLICATE_ENTRY, "You already belong to a workspace", 400);
+      throw new AppError(ErrorCodes.DUPLICATE_ENTRY, "You already belong to this workspace", 400);
     }
 
     // Create user with invite's role

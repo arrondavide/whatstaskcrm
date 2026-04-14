@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { ZodSchema } from "zod";
 import { AppError, ErrorCodes } from "./errors";
 import { error } from "./response";
@@ -41,9 +41,20 @@ export async function withAuth(request: NextRequest): Promise<AuthContext> {
   }
 
   // Look up the app user by Supabase Auth UID
-  const appUser = await db.query.users.findFirst({
-    where: eq(users.authUid, authUser.id),
-  });
+  // Support multi-workspace: check for tenant_id header to switch workspace
+  const requestedTenantId = request.headers.get("x-tenant-id");
+
+  let appUser;
+  if (requestedTenantId) {
+    appUser = await db.query.users.findFirst({
+      where: and(eq(users.authUid, authUser.id), eq(users.tenantId, requestedTenantId)),
+    });
+  } else {
+    appUser = await db.query.users.findFirst({
+      where: eq(users.authUid, authUser.id),
+      orderBy: (u, { desc }) => [desc(u.lastActive)],
+    });
+  }
 
   if (!appUser) {
     throw new AppError(ErrorCodes.USER_NOT_FOUND, "User profile not found. Complete onboarding first.", 404);
