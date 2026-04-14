@@ -44,7 +44,6 @@ const settingsItems = [
   { label: "Fields", href: "/settings/fields" },
   { label: "Branding", href: "/settings/branding" },
   { label: "Roles", href: "/settings/roles" },
-  { label: "Billing", href: "/settings/billing" },
 ];
 
 type Workspace = {
