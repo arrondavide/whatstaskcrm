@@ -277,6 +277,40 @@ export const notifications = pgTable(
 
 // ── TEMPLATES ──────────────────────────────────────
 
+export type TemplateBlock = {
+  id: string;
+  type: "header" | "text" | "field" | "image" | "dynamic_image" | "table" | "divider" | "columns" | "spacer" | "list";
+  content?: string;
+  fieldId?: string;
+  src?: string; // for static images
+  children?: TemplateBlock[]; // for columns
+  style?: {
+    fontSize?: number;
+    fontWeight?: string;
+    color?: string;
+    textAlign?: string;
+    backgroundColor?: string;
+    padding?: number;
+    marginTop?: number;
+    marginBottom?: number;
+    width?: string;
+    height?: number;
+    borderRadius?: number;
+    objectFit?: string;
+  };
+};
+
+export type TemplateStyles = {
+  pageSize?: "A4" | "Letter" | "Legal";
+  orientation?: "portrait" | "landscape";
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
+  fontFamily?: string;
+  baseColor?: string;
+};
+
 export const templates = pgTable("templates", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id")
@@ -284,7 +318,9 @@ export const templates = pgTable("templates", {
     .references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  content: text("content").notNull(),
+  content: text("content").notNull().default(""),
+  blocks: jsonb("blocks").$type<TemplateBlock[]>().default([]),
+  styles: jsonb("styles").$type<TemplateStyles>().default({}),
   fieldMappings: jsonb("field_mappings").$type<Record<string, string>>().notNull().default({}),
   createdBy: text("created_by").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

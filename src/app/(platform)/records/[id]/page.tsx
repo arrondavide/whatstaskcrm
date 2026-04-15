@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Trash2, MessageSquare, Link2, History, AlertTriangle, X, Send } from "lucide-react";
+import { ArrowLeft, Save, Trash2, MessageSquare, Link2, History, AlertTriangle, X, Send, FileDown } from "lucide-react";
 import { useRecord, useUpdateRecord, useDeleteRecord } from "@/hooks/queries/use-records";
 import { useFields } from "@/hooks/queries/use-fields";
 import { useAppUser } from "@/hooks/queries/use-auth";
@@ -27,6 +27,18 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [linkSearch, setLinkSearch] = useState("");
+  const [showGenerate, setShowGenerate] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  // Templates for document generation
+  const { data: templatesList } = useQuery({
+    queryKey: ["templates"],
+    queryFn: async () => {
+      const res = await fetch("/api/templates");
+      const d = await res.json();
+      return d.data ?? [];
+    },
+  });
   const qc = useQueryClient();
 
   if (isLoading) {
@@ -38,6 +50,12 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
   }
 
   const isEditing = editData !== null;
+
+  const getFirstFieldValue = () => {
+    const firstField = fields?.find((f) => f.showInTable);
+    if (!firstField) return "document";
+    return String((record.data as Record<string, unknown>)[firstField.id] ?? "document");
+  };
 
   const handleSave = () => {
     if (!editData) return;
@@ -96,6 +114,13 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
             </>
           ) : (
             <>
+              <button
+                onClick={() => setShowGenerate(true)}
+                className="flex items-center gap-2 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
+              >
+                <FileDown size={16} />
+                Generate PDF
+              </button>
               <button
                 onClick={() => setEditData({ ...(record.data as Record<string, unknown>) })}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
@@ -189,6 +214,88 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
+      {/* ── Generate Document Modal ── */}
+      {showGenerate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-gray-700 bg-gray-900 p-6">
+            <h2 className="text-lg font-bold text-white">Generate Document</h2>
+            <p className="mt-1 text-sm text-gray-400">Select a template to generate a PDF for this record</p>
+            <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
+              {(!templatesList || templatesList.length === 0) ? (
+                <p className="py-4 text-center text-sm text-gray-500">
+                  No templates yet. Go to Templates to create one.
+                </p>
+              ) : (
+                templatesList.map((t: { id: string; name: string; description: string | null }) => (
+                  <button
+                    key={t.id}
+                    onClick={async () => {
+                      setGenerating(true);
+                      try {
+                        // Fetch template with blocks
+                        const res = await fetch(`/api/templates/${t.id}`);
+                        const d = await res.json();
+                        if (!d.success) throw new Error("Failed to load template");
+                        const tmpl = d.data;
+
+                        // Build HTML from blocks + record data
+                        const html = buildDocumentHTML(tmpl.blocks ?? [], tmpl.styles ?? {}, record.data as Record<string, unknown>, fields ?? []);
+
+                        // Generate PDF using jspdf + html
+                        const { default: jsPDF } = await import("jspdf");
+                        const doc = new jsPDF({
+                          orientation: tmpl.styles?.orientation === "landscape" ? "landscape" : "portrait",
+                          unit: "pt",
+                          format: tmpl.styles?.pageSize?.toLowerCase() ?? "a4",
+                        });
+
+                        // Use html method
+                        const container = globalThis.document.createElement("div");
+                        container.innerHTML = html;
+                        container.style.width = tmpl.styles?.orientation === "landscape" ? "842px" : "595px";
+                        container.style.position = "absolute";
+                        container.style.left = "-9999px";
+                        globalThis.document.body.appendChild(container);
+
+                        await doc.html(container, {
+                          callback: (doc) => {
+                            doc.save(`${tmpl.name} - ${getFirstFieldValue()}.pdf`);
+                            globalThis.document.body.removeChild(container);
+                          },
+                          x: tmpl.styles?.marginLeft ?? 40,
+                          y: tmpl.styles?.marginTop ?? 40,
+                          width: (tmpl.styles?.orientation === "landscape" ? 842 : 595) - ((tmpl.styles?.marginLeft ?? 40) + (tmpl.styles?.marginRight ?? 40)),
+                          windowWidth: tmpl.styles?.orientation === "landscape" ? 842 : 595,
+                        });
+
+                        setShowGenerate(false);
+                        toast.success("PDF generated!");
+                      } catch (err) {
+                        toast.error("Failed to generate PDF");
+                        console.error(err);
+                      } finally {
+                        setGenerating(false);
+                      }
+                    }}
+                    disabled={generating}
+                    className="flex w-full items-center gap-3 rounded-lg border border-gray-800 p-3 text-left hover:border-violet-500 hover:bg-gray-800/50 disabled:opacity-50"
+                  >
+                    <FileDown size={18} className="text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-white">{t.name}</p>
+                      {t.description && <p className="text-xs text-gray-500">{t.description}</p>}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setShowGenerate(false)} className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Tabs: Comments | Linked Records | History ── */}
       <div className="mt-6">
         <div className="flex gap-1 border-b border-gray-800">
@@ -220,6 +327,71 @@ export default function RecordDetailPage({ params }: { params: Promise<{ id: str
       </div>
     </div>
   );
+}
+
+// ── Build Document HTML from Template Blocks ──────
+
+function buildDocumentHTML(
+  blocks: { id: string; type: string; content?: string; fieldId?: string; src?: string; style?: Record<string, unknown> }[],
+  styles: Record<string, unknown>,
+  recordData: Record<string, unknown>,
+  fields: { id: string; label: string; showInTable: boolean }[]
+): string {
+  const getVal = (fieldId: string) => {
+    const val = recordData[fieldId];
+    if (val === null || val === undefined) return "";
+    if (Array.isArray(val)) return val.map((v) => typeof v === "object" && v !== null && "name" in v ? (v as { name: string }).name : String(v)).join(", ");
+    return String(val);
+  };
+
+  const getLabel = (fieldId: string) => fields.find((f) => f.id === fieldId)?.label ?? fieldId;
+
+  const css = (s: Record<string, unknown> | undefined) => {
+    if (!s) return "";
+    const map: Record<string, string> = {};
+    if (s.fontSize) map["font-size"] = `${s.fontSize}px`;
+    if (s.fontWeight) map["font-weight"] = String(s.fontWeight);
+    if (s.color) map["color"] = String(s.color);
+    if (s.textAlign) map["text-align"] = String(s.textAlign);
+    if (s.backgroundColor) map["background-color"] = String(s.backgroundColor);
+    if (s.padding) map["padding"] = `${s.padding}px`;
+    if (s.marginTop) map["margin-top"] = `${s.marginTop}px`;
+    if (s.marginBottom) map["margin-bottom"] = `${s.marginBottom}px`;
+    return Object.entries(map).map(([k, v]) => `${k}:${v}`).join(";");
+  };
+
+  const html = blocks.map((block) => {
+    const s = block.style ?? {};
+    switch (block.type) {
+      case "header":
+        return `<div style="${css(s)}">${block.content ?? ""}</div>`;
+      case "text":
+        return `<div style="${css(s)}">${block.content ?? ""}</div>`;
+      case "field":
+        return `<div style="${css(s)}">${block.fieldId ? getVal(block.fieldId) : ""}</div>`;
+      case "image":
+        return block.src ? `<div style="text-align:${s.textAlign ?? "left"}"><img src="${block.src}" style="width:${s.width ?? 150}px;height:${s.height ?? "auto"}px;object-fit:contain;" /></div>` : "";
+      case "dynamic_image": {
+        if (!block.fieldId) return "";
+        const val = recordData[block.fieldId];
+        const files = Array.isArray(val) ? val : [];
+        const first = files[0] as { url?: string } | undefined;
+        return first?.url ? `<div style="text-align:${s.textAlign ?? "left"}"><img src="${first.url}" style="width:${s.width ?? 120}px;height:${s.height ?? 120}px;object-fit:cover;border-radius:${s.borderRadius ?? 0}px;" /></div>` : "";
+      }
+      case "table":
+        return `<table style="width:100%;font-size:${s.fontSize ?? 11}px;border-collapse:collapse;${css(s)}">
+          ${fields.filter((f) => f.showInTable).map((f) => `<tr style="border-bottom:1px solid #eee"><td style="padding:4px 8px;font-weight:600;color:#555;width:30%">${f.label}</td><td style="padding:4px 8px;color:#333">${getVal(f.id)}</td></tr>`).join("")}
+        </table>`;
+      case "divider":
+        return `<hr style="border:none;border-top:1px solid ${s.color ?? "#ddd"};margin:${s.marginTop ?? 8}px 0 ${s.marginBottom ?? 8}px 0;" />`;
+      case "spacer":
+        return `<div style="height:${s.height ?? 20}px"></div>`;
+      default:
+        return "";
+    }
+  }).join("\n");
+
+  return `<div style="font-family:${styles.fontFamily ?? "Helvetica"},Arial,sans-serif;color:#333;line-height:1.5">${html}</div>`;
 }
 
 // ── Comments Section ──────────────────────────────
