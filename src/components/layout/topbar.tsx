@@ -92,7 +92,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-gray-800 bg-gray-900 px-4">
+    <header className="flex h-14 items-center justify-between px-4" style={{ backgroundColor: "var(--topbar-bg)", borderBottom: "1px solid var(--topbar-border)" }}>
       <div className="flex items-center gap-4">
         <button
           onClick={toggleSidebar}

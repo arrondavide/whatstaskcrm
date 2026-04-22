@@ -6,6 +6,7 @@ import "./globals.css";
 const urbanist = Urbanist({
   variable: "--font-urbanist",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -19,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${urbanist.variable} h-full antialiased dark`}>
-      <body className="min-h-full flex flex-col font-[family-name:var(--font-urbanist)] bg-gray-950 text-gray-100">
+    <html lang="en" className={`${urbanist.variable} h-full antialiased dark`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
