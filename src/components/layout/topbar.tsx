@@ -203,9 +203,12 @@ export function Topbar() {
         <div className="relative">
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-gray-800"
+            className="flex items-center gap-2 rounded-lg p-1.5 transition-colors"
+            style={{ backgroundColor: "transparent" }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-xs font-medium text-white">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium text-white" style={{ backgroundColor: "var(--accent)" }}>
               {appData?.user?.name?.charAt(0).toUpperCase() ?? "?"}
             </div>
           </button>
@@ -213,14 +216,23 @@ export function Topbar() {
           {showUserMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-              <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-700 bg-gray-800 py-1 shadow-xl">
-                <div className="border-b border-gray-700 px-3 py-2">
-                  <p className="text-sm font-medium text-white">{appData?.user?.name}</p>
-                  <p className="text-xs text-gray-400">{appData?.user?.email}</p>
+              <div
+                className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl py-1"
+                style={{ backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-primary)", boxShadow: "var(--shadow-xl)" }}
+              >
+                <div className="px-3 py-2" style={{ borderBottom: "1px solid var(--border-primary)" }}>
+                  <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{appData?.user?.name}</p>
+                  <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>{appData?.user?.email}</p>
                 </div>
                 <button
-                  onClick={signOut}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-gray-700"
+                  onClick={async () => {
+                    await signOut();
+                    globalThis.location.assign("/login");
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors"
+                  style={{ color: "var(--error)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--error-light)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   <LogOut size={14} />
                   Sign out
