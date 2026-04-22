@@ -34,6 +34,8 @@ const actionLabels: Record<string, string> = {
   "record.imported": "imported records",
   "record.merged": "merged records",
   "field.created": "created a field",
+  "field.updated": "updated a field",
+  "field.deleted": "deleted a field",
   "invite.created": "sent an invite",
   "invite.accepted": "joined the workspace",
   "tenant.updated": "updated settings",
