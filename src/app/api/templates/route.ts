@@ -9,7 +9,7 @@ import { z } from "zod";
 const createTemplateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().optional(),
-  content: z.string().min(1),
+  content: z.string().optional().default(""),
   fieldMappings: z.record(z.string(), z.string()).optional(),
 });
 
